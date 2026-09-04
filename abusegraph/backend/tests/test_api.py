@@ -243,3 +243,39 @@ def test_end_to_end_audit_trail_sequence() -> None:
         assert "merchant_decision" in updated_event_names
 
 
+def test_admin_case_detail_zero_audit_logs() -> None:
+    with TestClient(app) as client:
+        admin_token = get_token(client, "admin")
+        headers_admin = {"Authorization": f"Bearer {admin_token}"}
+
+        # Create a RiskCase manually with ZERO AuditLog entries attached
+        with SessionLocal() as db:
+            empty_case = RiskCase(
+                case_type="REFUND",
+                cluster_id="cls_empty_test",
+                cluster_key=f"cluster:empty_{uuid4().hex[:6]}",
+                customer_ids="[]",
+                num_customers=1,
+                num_orders=1,
+                num_refunds=1,
+                total_amount=50.0,
+                ml_score=0.10,
+                graph_score=0.00,
+                final_score=0.06,
+                reason_codes="[]",
+                status="Allow",
+            )
+            db.add(empty_case)
+            db.commit()
+            db.refresh(empty_case)
+            case_id = empty_case.id
+
+        # Query admin case detail
+        res = client.get(f"/api/admin/cases/{case_id}", headers=headers_admin)
+        assert res.status_code == 200
+        body = res.json()
+        assert body["id"] == case_id
+        assert body["audit_trail"] == []
+
+
+

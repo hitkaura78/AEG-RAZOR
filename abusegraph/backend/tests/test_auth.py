@@ -41,3 +41,18 @@ def test_seeded_merchant_and_admin_roles() -> None:
         admin_token = login(client, DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD)
         admin_me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {admin_token}"})
         assert admin_me.json()["role"] == "admin"
+
+
+def test_auth_invalid_credentials_handling() -> None:
+    with TestClient(app) as client:
+        # Invalid password
+        bad_pass = client.post("/api/auth/login", json={"email": DEMO_ADMIN_EMAIL, "password": "WrongPassword123!"})
+        assert bad_pass.status_code == 401
+
+        # Non-existent user
+        no_user = client.post("/api/auth/login", json={"email": "nonexistent@example.com", "password": "Password123!"})
+        assert no_user.status_code == 401
+
+        # Missing token header
+        no_token = client.get("/api/auth/me")
+        assert no_token.status_code == 401

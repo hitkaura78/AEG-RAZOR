@@ -176,3 +176,4 @@ def test_full_system_e2e_journey() -> None:
         assert "agent_explanation_generated" in audit_events
         assert "policy_evaluated" in audit_events
         assert "merchant_decision" in audit_events
+

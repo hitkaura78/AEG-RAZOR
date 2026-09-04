@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import select
 
+from backend.app.core import agent, features, graph_engine, risk_engine
 from backend.app.core.database import Base, engine, SessionLocal
 from backend.app.core.models import RiskCase
 from backend.app.core.pipeline import (
@@ -79,4 +80,110 @@ def test_simulate_event() -> None:
         assert "customer_id" in sim_result
         assert "status" in sim_result
         assert sim_result["status"] in ("Allow", "Review", "Restrict")
+
+
+def test_ml_model_metrics_sanity_and_importances() -> None:
+    with SessionLocal() as db:
+        run_training_pipeline(db)
+        metrics = PIPELINE_STATE.get("metrics")
+        assert metrics is not None
+        # Sanity check: Metrics must be non-zero and realistic (not suspiciously perfect 1.0)
+        assert 0.40 <= metrics.get("precision", 0) <= 1.0
+        assert 0.40 <= metrics.get("recall", 0) <= 1.0
+        assert 0.40 <= metrics.get("f1", 0) <= 1.0
+        assert 0.40 <= metrics.get("pr_auc", 0) <= 1.0
+
+        pr_curve = PIPELINE_STATE.get("pr_curve")
+        assert isinstance(pr_curve, list) and len(pr_curve) > 0
+
+        importances = PIPELINE_STATE.get("importances")
+        assert isinstance(importances, dict) and len(importances) > 0
+        for name in features.FEATURE_NAMES:
+            assert name in importances
+
+
+def test_graph_clustering_ring_members_and_multi_ring_merging() -> None:
+    with SessionLocal() as db:
+        run_training_pipeline(db)
+        syn_custs = PIPELINE_STATE.get("synthetic_customers", [])
+        syn_orders = PIPELINE_STATE.get("synthetic_orders", [])
+        syn_refunds = PIPELINE_STATE.get("synthetic_refunds", [])
+
+        # Verify graph computation on synthetic ring customers
+        graph = graph_engine.build_customer_graph(syn_custs)
+        cluster_feats = graph_engine.compute_cluster_features(syn_custs, syn_orders, syn_refunds)
+
+        ring_custs = [c for c in syn_custs if c.get("population") == "coordinated_ring"]
+        assert len(ring_custs) >= 2
+        first_ring_id = str(ring_custs[0]["id"])
+        feat = cluster_feats.get(first_ring_id, {})
+        assert feat.get("cluster_size", 1) >= 2
+        assert feat.get("graph_score", 0.0) >= 0.50
+
+        # EDGE CASE 2: Device shared across TWO DIFFERENT rings / customer clusters
+        ring_a_id = "test_ring_a_cust"
+        ring_b_id = "test_ring_b_cust"
+        shared_bridge_device = "dev_bridge_ring_ab"
+
+        cust_a = {"id": ring_a_id, "device_id": shared_bridge_device, "ip_address_id": "198.51.100.101", "population": "normal"}
+        cust_b = {"id": ring_b_id, "device_id": shared_bridge_device, "ip_address_id": "198.51.100.102", "population": "normal"}
+
+        merged_dataset = syn_custs + [cust_a, cust_b]
+        merged_graph = graph_engine.build_customer_graph(merged_dataset)
+        merged_feats = graph_engine.compute_cluster_features(merged_dataset, syn_orders, syn_refunds)
+
+        assert merged_graph.has_edge(ring_a_id, ring_b_id)
+        assert merged_feats[ring_a_id]["shared_device"] is True
+        assert merged_feats[ring_b_id]["shared_device"] is True
+
+
+def test_risk_engine_combine_math_and_reason_codes() -> None:
+    # 1. Test score combination formula: 0.60 * ml_score + 0.40 * (graph_score / 6.0)
+    # When graph_score = 3.0 (3.0 / 6.0 = 0.50 normalized): 0.60 * 0.80 + 0.40 * 0.50 = 0.68
+    score_1 = risk_engine.combine(0.80, 3.0)
+    assert round(score_1, 4) == round(0.60 * 0.80 + 0.40 * (3.0 / 6.0), 4) == 0.68
+
+    score_min = risk_engine.combine(0.00, 0.00)
+    assert score_min == 0.00
+
+    score_max = risk_engine.combine(1.00, 6.00)
+    assert score_max == 1.00
+
+    # 2. Test reason codes mapping
+    cluster_meta = {"shared_device": True, "shared_ip": True, "shared_address": False, "cluster_size": 4}
+    codes = risk_engine.reason_codes_for(cluster_meta, ml_score=0.85, refund_velocity=12.0, graph_score=4.5)
+
+    assert "SHARED_DEVICE" in codes
+    assert "SHARED_IP" in codes
+    assert "LARGE_CLUSTER" in codes
+    assert "HIGH_REFUND_VELOCITY" in codes
+    assert "HIGH_INDIVIDUAL_RISK" in codes
+
+
+def test_agent_explanation_grounding_and_no_hallucinations() -> None:
+    evidence = {
+        "cluster_size": 3,
+        "shared_device": True,
+        "shared_ip": False,
+        "shared_address": False,
+        "avg_time_to_refund_hours": 12.5,
+        "ml_score": 0.75,
+        "graph_score": 0.80,
+        "final_score": 0.77,
+        "is_new_customer": True,
+        "prior_refund_count": 0,
+        "prior_case_count": 0,
+    }
+
+    res = agent.investigate(evidence)
+    explanation = res["explanation"]
+    assert isinstance(explanation, str) and len(explanation) > 0
+
+    # Verify numbers present in explanation match numbers in evidence dictionary
+    assert "3" in explanation
+    assert "12.5" in explanation
+    assert "0.75" in explanation
+    assert "0.8" in explanation
+    assert "0.77" in explanation
+
 

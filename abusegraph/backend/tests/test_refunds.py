@@ -76,3 +76,17 @@ def test_customer_cannot_refund_someone_elses_order() -> None:
             json={"order_id": order_id, "reason": "Not my order"},
         )
         assert response.status_code in {403, 404}
+
+
+def test_zero_order_history_customer_refund_returns_404() -> None:
+    with TestClient(app) as client:
+        token = customer_token(client, "zero-history")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        res = client.post(
+            "/api/refunds",
+            headers=headers,
+            json={"order_id": 999999, "reason": "Non-existent order refund attempt"},
+        )
+        assert res.status_code == 404
+        assert res.json()["detail"] == "Order not found"
