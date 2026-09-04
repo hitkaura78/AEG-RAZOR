@@ -10,6 +10,7 @@ python-dotenv
 pydantic
 anthropic
 passlib[bcrypt]
+bcrypt<5
 python-jose[cryptography]
 python-multipart
 pytest
