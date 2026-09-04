@@ -1,12 +1,15 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, select, text
 
+from .api.admin import router as admin_router
 from .api.auth import router as auth_router
+from .api.customer import router as customer_router
 from .api.merchant import router as merchant_router
-from .api.orders import router as orders_router
-from .api.refunds import router as refunds_router
 from .core.auth import hash_password
 from .core.database import Base, SessionLocal, engine
 from .core.models import Product, User
@@ -56,9 +59,18 @@ def migrate_schema() -> None:
     inspector = inspect(engine)
     if "audit_logs" in inspector.get_table_names():
         columns = {column["name"] for column in inspector.get_columns("audit_logs")}
-        if "refund_id" not in columns:
-            with engine.begin() as connection:
-                connection.execute(text("ALTER TABLE audit_logs ADD COLUMN refund_id INTEGER"))
+        migrations = {
+            "refund_id": "ALTER TABLE audit_logs ADD COLUMN refund_id INTEGER",
+            "case_id": "ALTER TABLE audit_logs ADD COLUMN case_id INTEGER",
+            "timestamp": "ALTER TABLE audit_logs ADD COLUMN timestamp DATETIME",
+            "actor": "ALTER TABLE audit_logs ADD COLUMN actor VARCHAR(30) NOT NULL DEFAULT 'system'",
+            "action": "ALTER TABLE audit_logs ADD COLUMN action VARCHAR(100) NOT NULL DEFAULT 'legacy_event'",
+            "details": "ALTER TABLE audit_logs ADD COLUMN details TEXT NOT NULL DEFAULT '{}'",
+        }
+        with engine.begin() as connection:
+            for column, statement in migrations.items():
+                if column not in columns:
+                    connection.execute(text(statement))
 
 
 @asynccontextmanager
@@ -71,7 +83,23 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AbuseGraph", lifespan=lifespan)
+
+# Enable CORS for local frontend origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount role-scoped API routers
 app.include_router(auth_router)
+app.include_router(customer_router)
 app.include_router(merchant_router)
-app.include_router(orders_router)
-app.include_router(refunds_router)
+app.include_router(admin_router)
+
+# Mount static frontend directory
+frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+if frontend_dir.exists():
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")

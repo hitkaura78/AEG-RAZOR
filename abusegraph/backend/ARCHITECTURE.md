@@ -38,6 +38,20 @@ conservative demo threshold makes rapid multi-account activity visible while
 allowing a normal isolated checkout through. It is not the full refund-abuse
 pipeline and has no ML model, graph investigation, or agent.
 
+The combined risk engine uses `ML_WEIGHT=0.6` and `GRAPH_WEIGHT=0.4`. Graph
+scores from the relationship engine are normalized by their maximum explainable
+edge weight of 6 before combination. `CASE_THRESHOLD=0.55` is a configurable
+demo reference tuned below a typical production threshold because the
+synthetic dataset deliberately has denser suspicious behavior. The risk
+engine only computes the normalized score and reason codes; Phase 10 policy
+logic owns all Allow/Review/Restrict decisions.
+
+The investigation agent is informational only. It receives the score,
+relationship, timing, and customer-history evidence and returns an explanation
+plus a recommendation for an authorized reviewer. It never sets an order or
+case status; only `policy.decide()` may do that. Without an Anthropic API key,
+the deterministic fallback uses the same evidence and shared-IP/address
+caveats with no external configuration.
 ## 2. User Experiences and Data Visibility
 
 ### Customer

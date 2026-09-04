@@ -1,6 +1,6 @@
 from collections.abc import Generator
-from pathlib import Path
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
@@ -9,10 +9,8 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"sqlite:///{Path(__file__).resolve().parents[2] / 'abusegraph.db'}",
-)
+DEFAULT_DB_PATH = os.path.join(str(Path(__file__).resolve().parents[2]), "abusegraph.db")
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AbuseGraph - Merchant Review Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Header Navigation -->
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="showTab('pending')">
+        <div class="bg-indigo-600 p-2 rounded-lg text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+          </svg>
+        </div>
+        <div>
+          <span class="text-lg font-bold tracking-tight">Merchant Portal</span>
+          <span class="text-xs text-slate-400 block -mt-1">AbuseGraph Decision Center</span>
+        </div>
+      </div>
+
+      <!-- Logged In Header -->
+      <nav id="nav-merchant" class="hidden flex items-center space-x-6">
+        <button onclick="showTab('pending')" id="tab-btn-pending" class="relative text-white font-medium text-sm transition flex items-center space-x-2">
+          <span>Needs Decision</span>
+          <span id="pending-badge" class="bg-amber-500 text-slate-950 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-[20px] text-center hidden">0</span>
+        </button>
+        <button onclick="showTab('history')" id="tab-btn-history" class="text-slate-300 hover:text-white font-medium text-sm transition">
+          Processed History
+        </button>
+        <div class="h-4 w-px bg-slate-700"></div>
+        <span id="merchant-user-display" class="text-xs text-slate-300 font-mono"></span>
+        <button onclick="logoutMerchant()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-md font-medium transition border border-slate-700">
+          Sign Out
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Global Alerts -->
+  <div id="alert-container" class="max-w-7xl mx-auto px-4 mt-4 w-full"></div>
+
+  <!-- Main Content -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Login View -->
+    <section id="view-login" class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+      <div class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-slate-900">Merchant Sign In</h1>
+        <p class="text-xs text-slate-500 mt-1">Review flagged customer requests with evidence-grounded insights.</p>
+      </div>
+
+      <form onsubmit="handleMerchantLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Merchant Email</label>
+          <input type="email" id="merchant-email" required value="merchant@demo.abusegraph" class="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Password</label>
+          <input type="password" id="merchant-password" required value="DemoMerchant123!" class="w-full px-3.5 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+        </div>
+        <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 rounded-lg text-sm shadow-sm transition">
+          Sign In to Portal
+        </button>
+      </form>
+    </section>
+
+    <!-- Dashboard View -->
+    <section id="view-dashboard" class="hidden space-y-6">
+
+      <!-- Pending Cases View -->
+      <div id="section-pending" class="space-y-4">
+        <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">Cases Awaiting Decision</h2>
+            <p class="text-xs text-slate-500">Review human-readable evidence summaries and accept or reject refund requests.</p>
+          </div>
+          <button onclick="loadMerchantData()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium transition">
+            Refresh Queue
+          </button>
+        </div>
+
+        <div id="pending-cases-list" class="space-y-4"></div>
+      </div>
+
+      <!-- Processed History View -->
+      <div id="section-history" class="hidden space-y-4">
+        <div class="bg-white p-4 rounded-xl border border-slate-200">
+          <h2 class="text-lg font-bold text-slate-900">Processed Decision History</h2>
+          <p class="text-xs text-slate-500">Archive of resolved merchant decisions and historical outcomes.</p>
+        </div>
+
+        <div id="history-cases-list" class="space-y-4"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Decision Confirmation Modal -->
+  <div id="decision-modal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+      <h3 id="modal-title" class="text-lg font-bold text-slate-900 mb-2">Confirm Decision</h3>
+      <p id="modal-desc" class="text-xs text-slate-600 mb-4"></p>
+      
+      <form onsubmit="submitDecision(event)">
+        <input type="hidden" id="modal-case-id">
+        <input type="hidden" id="modal-decision-type">
+        
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Optional Decision Note</label>
+          <textarea id="modal-note" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Add an internal reviewer note..."></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3">
+          <button type="button" onclick="closeDecisionModal()" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancel</button>
+          <button type="submit" id="modal-submit-btn" class="px-4 py-2 text-sm text-white rounded-lg font-medium">Confirm</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="bg-white border-t border-slate-200 mt-12 py-6 text-center text-xs text-slate-400">
+    AbuseGraph Merchant Portal &bull; Role-Protected Decision Interface
+  </footer>
+
+  <script>
+    function getMerchantToken() {
+      return localStorage.getItem("merchant_token");
+    }
+
+    function merchantHeaders() {
+      return {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + getMerchantToken()
+      };
+    }
+
+    function showAlert(message, type = "info") {
+      const container = document.getElementById("alert-container");
+      const colors = {
+        success: "bg-emerald-50 text-emerald-800 border-emerald-200",
+        warning: "bg-amber-50 text-amber-800 border-amber-200",
+        error: "bg-rose-50 text-rose-800 border-rose-200",
+        info: "bg-slate-100 text-slate-800 border-slate-200"
+      };
+      container.innerHTML = `
+        <div class="p-4 rounded-lg border text-sm font-medium flex justify-between items-center ${colors[type] || colors.info}">
+          <span>${message}</span>
+          <button onclick="this.parentElement.remove()" class="text-xs font-bold ml-4">&times;</button>
+        </div>
+      `;
+    }
+
+    async function handleMerchantLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById("merchant-email").value.trim();
+      const password = document.getElementById("merchant-password").value;
+
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Authentication failed");
+
+        localStorage.setItem("merchant_token", data.access_token);
+        await initMerchantApp();
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    function logoutMerchant() {
+      localStorage.removeItem("merchant_token");
+      document.getElementById("view-login").classList.remove("hidden");
+      document.getElementById("view-dashboard").classList.add("hidden");
+      document.getElementById("nav-merchant").classList.add("hidden");
+    }
+
+    async function initMerchantApp() {
+      const token = getMerchantToken();
+      if (!token) {
+        document.getElementById("view-login").classList.remove("hidden");
+        document.getElementById("view-dashboard").classList.add("hidden");
+        document.getElementById("nav-merchant").classList.add("hidden");
+        return;
+      }
+
+      try {
+        const meRes = await fetch("/api/auth/me", { headers: merchantHeaders() });
+        if (!meRes.ok) throw new Error("Session expired");
+        const user = await meRes.json();
+        
+        if (user.role !== "merchant" && user.role !== "admin") {
+          throw new Error("Merchant role authorization required.");
+        }
+
+        document.getElementById("merchant-user-display").textContent = user.email;
+        document.getElementById("nav-merchant").classList.remove("hidden");
+        document.getElementById("view-login").classList.add("hidden");
+        document.getElementById("view-dashboard").classList.remove("hidden");
+
+        await loadMerchantData();
+      } catch (err) {
+        showAlert(err.message, "error");
+        logoutMerchant();
+      }
+    }
+
+    function showTab(tab) {
+      document.getElementById("section-pending").classList.toggle("hidden", tab !== 'pending');
+      document.getElementById("section-history").classList.toggle("hidden", tab !== 'history');
+      document.getElementById("tab-btn-pending").className = tab === 'pending' ? "relative text-white font-medium text-sm transition flex items-center space-x-2" : "text-slate-400 hover:text-white font-medium text-sm transition flex items-center space-x-2";
+      document.getElementById("tab-btn-history").className = tab === 'history' ? "text-white font-medium text-sm transition" : "text-slate-400 hover:text-white font-medium text-sm transition";
+    }
+
+    const REASON_MAPPINGS = {
+      "SHARED_DEVICE": "Multiple customer accounts share the same physical device fingerprint",
+      "SHARED_ADDRESS": "Multiple customer accounts share the same shipping or billing address",
+      "SHARED_IP": "Multiple customer accounts share the same network IP address",
+      "LARGE_CLUSTER": "Part of a large cluster of interconnected customer accounts",
+      "HIGH_REFUND_VELOCITY": "Unusually high frequency of refund requests",
+      "HIGH_INDIVIDUAL_RISK": "Transaction history matches elevated risk criteria",
+      "ELEVATED_RISK_SCORE": "Combined transaction and relationship signals exceed standard threshold"
+    };
+
+    function formatReasonCode(code) {
+      return REASON_MAPPINGS[code] || code.replace(/_/g, " ");
+    }
+
+    function getRiskBand(status) {
+      if (status === "RESTRICTED" || status === "Restrict") return { text: "High Risk Band", class: "bg-rose-100 text-rose-800 border-rose-200" };
+      if (status === "PENDING_REVIEW" || status === "Review") return { text: "Elevated Risk Band", class: "bg-amber-100 text-amber-800 border-amber-200" };
+      return { text: "Low Risk Band", class: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+    }
+
+    async function loadMerchantData() {
+      try {
+        const refundsRes = await fetch("/api/merchant/refunds", { headers: merchantHeaders() });
+        const refunds = await refundsRes.json();
+        if (!refundsRes.ok) throw new Error("Failed to load merchant requests");
+
+        // Fetch detailed evidence for cases
+        const pendingContainer = document.getElementById("pending-cases-list");
+        const historyContainer = document.getElementById("history-cases-list");
+
+        // Filter pending refunds
+        const pendingRefunds = refunds.filter(r => r.status === "PENDING_REVIEW" || r.status === "Review");
+        const historyRefunds = refunds.filter(r => r.status !== "PENDING_REVIEW" && r.status !== "Review");
+
+        // Update Pending Counter Badge
+        const badge = document.getElementById("pending-badge");
+        if (pendingRefunds.length > 0) {
+          badge.textContent = pendingRefunds.length;
+          badge.classList.remove("hidden");
+        } else {
+          badge.classList.add("hidden");
+        }
+
+        // Render Pending Queue
+        if (pendingRefunds.length === 0) {
+          pendingContainer.innerHTML = `<div class="p-8 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-sm">No cases currently require a decision.</div>`;
+        } else {
+          const pendingCards = await Promise.all(pendingRefunds.map(async (r) => {
+            // Attempt case detail fetch
+            let caseDetail = null;
+            try {
+              const cRes = await fetch(`/api/merchant/cases/${r.id}`, { headers: merchantHeaders() });
+              if (cRes.ok) caseDetail = await cRes.json();
+            } catch (e) {}
+
+            const riskBand = getRiskBand(r.status);
+            const reasons = caseDetail ? (caseDetail.reason_codes || []) : [];
+            const explanation = caseDetail ? (caseDetail.agent_explanation || "Investigation summary available.") : "Standard merchant review requested.";
+
+            return `
+              <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <div class="flex items-center space-x-3 mb-1">
+                      <span class="text-base font-bold text-slate-900">Refund Request #${r.id}</span>
+                      <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${riskBand.class}">${riskBand.text}</span>
+                    </div>
+                    <div class="text-xs text-slate-500 space-x-3">
+                      <span>Customer ID: #${r.customer_id}</span>
+                      <span>Order ID: #${r.order_id}</span>
+                      <span>Requested Amount: <strong>$${r.amount.toFixed(2)}</strong></span>
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-xs text-slate-400 block">${new Date(r.created_at).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <!-- Bounded Evidence Section -->
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 text-xs space-y-3">
+                  <div>
+                    <span class="font-bold text-slate-700 block uppercase tracking-wider text-[10px] mb-1">Observed Risk Signals</span>
+                    <ul class="list-disc list-inside space-y-1 text-slate-700">
+                      ${reasons.length > 0 
+                        ? reasons.map(rc => `<li>${formatReasonCode(rc)}</li>`).join('')
+                        : `<li>Standard velocity review triggered</li>`}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <span class="font-bold text-slate-700 block uppercase tracking-wider text-[10px] mb-1">Investigation Narrative</span>
+                    <p class="text-slate-600 leading-relaxed italic bg-white p-3 rounded border border-slate-200">${explanation}</p>
+                  </div>
+                </div>
+
+                <!-- Merchant Actions -->
+                <div class="flex justify-end items-center space-x-3 pt-2">
+                  <button onclick="openDecisionModal(${r.id}, 'reject')" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs rounded-lg transition shadow-sm">
+                    Reject Refund (Restrict)
+                  </button>
+                  <button onclick="openDecisionModal(${r.id}, 'accept')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition shadow-sm">
+                    Accept Refund (Approve)
+                  </button>
+                </div>
+              </div>
+            `;
+          }));
+          pendingContainer.innerHTML = pendingCards.join('');
+        }
+
+        // Render History Queue
+        if (historyRefunds.length === 0) {
+          historyContainer.innerHTML = `<div class="p-8 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-sm">No historical decisions logged yet.</div>`;
+        } else {
+          historyContainer.innerHTML = historyRefunds.map(r => `
+            <div class="bg-white rounded-xl border border-slate-200 p-5 flex justify-between items-center">
+              <div>
+                <div class="flex items-center space-x-3 mb-1">
+                  <span class="font-bold text-slate-900 text-sm">Refund Request #${r.id}</span>
+                  <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full ${r.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">
+                    ${r.status}
+                  </span>
+                </div>
+                <div class="text-xs text-slate-500 space-x-3">
+                  <span>Customer #${r.customer_id}</span>
+                  <span>Reason: ${r.reason}</span>
+                  <span>Amount: $${r.amount.toFixed(2)}</span>
+                </div>
+              </div>
+              <span class="text-xs text-slate-400">${new Date(r.created_at).toLocaleDateString()}</span>
+            </div>
+          `).join('');
+        }
+
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    function openDecisionModal(caseId, decisionType) {
+      document.getElementById("modal-case-id").value = caseId;
+      document.getElementById("modal-decision-type").value = decisionType;
+      document.getElementById("modal-title").textContent = decisionType === 'accept' ? 'Accept Refund Request' : 'Reject Refund Request';
+      document.getElementById("modal-desc").textContent = decisionType === 'accept' 
+        ? 'Confirm accepting this refund. The case status will be updated to APPROVED.' 
+        : 'Confirm rejecting this refund. The case status will be updated to RESTRICTED.';
+      
+      const submitBtn = document.getElementById("modal-submit-btn");
+      submitBtn.className = decisionType === 'accept' 
+        ? "px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium"
+        : "px-4 py-2 text-sm text-white bg-rose-600 hover:bg-rose-700 rounded-lg font-medium";
+      submitBtn.textContent = decisionType === 'accept' ? 'Confirm Accept' : 'Confirm Reject';
+
+      document.getElementById("decision-modal").classList.remove("hidden");
+      document.getElementById("decision-modal").classList.add("flex");
+    }
+
+    function closeDecisionModal() {
+      document.getElementById("decision-modal").classList.add("hidden");
+      document.getElementById("decision-modal").classList.remove("flex");
+    }
+
+    async function submitDecision(e) {
+      e.preventDefault();
+      const caseId = parseInt(document.getElementById("modal-case-id").value);
+      const decision = document.getElementById("modal-decision-type").value;
+      const note = document.getElementById("modal-note").value.trim();
+
+      try {
+        const res = await fetch(`/api/merchant/cases/${caseId}/decision`, {
+          method: "POST",
+          headers: merchantHeaders(),
+          body: JSON.stringify({ decision, note })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed to process decision");
+
+        closeDecisionModal();
+        showAlert(`Decision successfully recorded: ${decision.toUpperCase()}`, "success");
+        await loadMerchantData();
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    initMerchantApp();
+  </script>
+</body>
+</html>
+

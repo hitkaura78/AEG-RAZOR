@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from ..core.auth import get_current_user
 from ..core.database import get_db
 from ..core.models import AuditLog, Order, Refund, User
-from ..core.refund_risk import evaluate_refund_risk
+from ..core.pipeline import evaluate_refund_risk
+from ..core.policy import persisted_status
 
 router = APIRouter(prefix="/api/refunds", tags=["refunds"])
 
@@ -53,22 +54,26 @@ def request_refund(
     ) or 0
     history_state = "EXISTING" if prior_order_count + prior_refund_count > 0 else "NEW"
     created_at = datetime.now(timezone.utc)
-    risk_status = evaluate_refund_risk(
+
+    policy_status = evaluate_refund_risk(
+        db=db,
         customer_id=user.customer_id,
         order_id=order.id,
         device_id=order.device_id,
         ip_address=order.ip_address.address,
     )
+
     refund = Refund(
         order_id=order.id,
         customer_id=user.customer_id,
         amount=order.amount,
         reason=request.reason.strip(),
-        status=risk_status,
+        status=persisted_status(policy_status),
         created_at=created_at,
     )
     db.add(refund)
     db.flush()
+
     audit_metadata = {
         "customer_history": history_state,
         "prior_order_count": prior_order_count,
@@ -83,14 +88,6 @@ def request_refund(
         order_id=order.id,
         refund_id=refund.id,
         metadata_json=json.dumps(audit_metadata),
-    ))
-    db.add(AuditLog(
-        event_name="risk_evaluated",
-        actor_user_id=user.id,
-        customer_id=user.customer_id,
-        order_id=order.id,
-        refund_id=refund.id,
-        metadata_json=json.dumps({**audit_metadata, "status": risk_status}),
     ))
     db.commit()
     db.refresh(refund)

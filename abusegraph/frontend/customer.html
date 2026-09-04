@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RazorShop - Customer Portal</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-indigo-600 text-white shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="showView('products')">
+        <svg class="w-8 h-8 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 11h14l1 12H4L5 11z"></path>
+        </svg>
+        <span class="text-xl font-bold tracking-tight">RazorShop</span>
+      </div>
+
+      <!-- Logged In Nav Links -->
+      <nav id="nav-links" class="hidden flex items-center space-x-6">
+        <button onclick="showView('products')" id="nav-products" class="text-white hover:text-indigo-200 font-medium text-sm transition">
+          Shop Products
+        </button>
+        <button onclick="showView('orders')" id="nav-orders" class="text-white hover:text-indigo-200 font-medium text-sm transition">
+          My Orders & Refunds
+        </button>
+        <div class="h-4 w-px bg-indigo-400"></div>
+        <span id="user-display" class="text-xs text-indigo-100 font-mono bg-indigo-700 px-2.5 py-1 rounded-full"></span>
+        <button onclick="logout()" class="text-xs bg-indigo-700 hover:bg-indigo-800 text-white px-3 py-1.5 rounded-md font-medium transition">
+          Sign Out
+        </button>
+      </nav>
+
+      <!-- Logged Out Status -->
+      <div id="nav-auth" class="flex items-center space-x-3">
+        <span class="text-xs text-indigo-200">Customer Portal</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Banner Alerts -->
+  <div id="alert-container" class="max-w-7xl mx-auto px-4 mt-4 w-full"></div>
+
+  <!-- Main Content Container -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- 1. Authentication View (Login / Register) -->
+    <section id="view-auth" class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+      <div class="flex border-b border-gray-200 mb-6">
+        <button id="tab-login" onclick="switchAuthTab('login')" class="flex-1 pb-3 text-center font-semibold text-indigo-600 border-b-2 border-indigo-600 text-sm">
+          Sign In
+        </button>
+        <button id="tab-register" onclick="switchAuthTab('register')" class="flex-1 pb-3 text-center font-semibold text-gray-500 hover:text-gray-700 text-sm">
+          Create Account
+        </button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="form-login" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Email Address</label>
+          <input type="email" id="login-email" required class="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="you@example.com">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Password</label>
+          <input type="password" id="login-password" required class="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="••••••••">
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm shadow-sm transition">
+          Sign In to Shop
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="form-register" onsubmit="handleRegister(event)" class="space-y-4 hidden">
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Full Name</label>
+          <input type="text" id="register-name" required class="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="Alex Morgan">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Email Address</label>
+          <input type="email" id="register-email" required class="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="you@example.com">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Password</label>
+          <input type="password" id="register-password" minlength="8" required class="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="At least 8 characters">
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm shadow-sm transition">
+          Create Account
+        </button>
+      </form>
+    </section>
+
+    <!-- 2. Products Catalog View -->
+    <section id="view-products" class="hidden">
+      <div class="mb-6 flex justify-between items-center">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Featured Catalog</h1>
+          <p class="text-sm text-gray-500">Explore premium items and enjoy fast fulfillment.</p>
+        </div>
+      </div>
+      <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </section>
+
+    <!-- 3. Orders & Refunds History View -->
+    <section id="view-orders" class="hidden space-y-8">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 mb-1">My Orders & Purchase History</h1>
+        <p class="text-sm text-gray-500 mb-4">View your recent orders and manage eligible refund requests.</p>
+        <div id="orders-list" class="space-y-4"></div>
+      </div>
+
+      <div class="pt-6 border-t border-gray-200">
+        <h2 class="text-xl font-bold text-gray-900 mb-1">My Refunds</h2>
+        <p class="text-sm text-gray-500 mb-4">Status of requested refunds for your orders.</p>
+        <div id="refunds-list" class="space-y-4"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Refund Request Modal -->
+  <div id="refund-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-gray-100">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-gray-900">Request Refund</h3>
+        <button onclick="closeRefundModal()" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+      </div>
+      <form onsubmit="submitRefund(event)">
+        <input type="hidden" id="refund-order-id">
+        <div class="mb-4">
+          <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Reason for Refund</label>
+          <select id="refund-reason-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm mb-2" onchange="toggleCustomReason(this.value)">
+            <option value="Item arrived damaged or broken">Item arrived damaged or broken</option>
+            <option value="Product not as described">Product not as described</option>
+            <option value="Received wrong item">Received wrong item</option>
+            <option value="Other">Other reason</option>
+          </select>
+          <textarea id="refund-reason-text" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm hidden" placeholder="Please describe the issue..."></textarea>
+        </div>
+        <div class="flex justify-end space-x-3">
+          <button type="button" onclick="closeRefundModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg font-medium">Cancel</button>
+          <button type="submit" class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium">Submit Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer class="bg-white border-t border-gray-200 mt-12 py-6 text-center text-xs text-gray-400">
+    RazorShop Customer Store &bull; Secure Checkout &bull; Demo Application
+  </footer>
+
+  <!-- Inline Frontend Logic -->
+  <script>
+    // SIMULATED FOR DEMO PURPOSES: Stable per-browser-session fingerprint and IP
+    let simDeviceFp = sessionStorage.getItem("sim_device_fp");
+    if (!simDeviceFp) {
+      simDeviceFp = "device-fp-" + Math.random().toString(36).substring(2, 11);
+      sessionStorage.setItem("sim_device_fp", simDeviceFp);
+    }
+    let simIp = sessionStorage.getItem("sim_ip");
+    if (!simIp) {
+      simIp = "198.51." + Math.floor(Math.random() * 200 + 1) + "." + Math.floor(Math.random() * 250 + 1);
+      sessionStorage.setItem("sim_ip", simIp);
+    }
+
+    function getToken() {
+      return localStorage.getItem("token");
+    }
+
+    function authHeaders() {
+      return {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + getToken()
+      };
+    }
+
+    function showAlert(message, type = "info") {
+      const container = document.getElementById("alert-container");
+      const colors = {
+        success: "bg-emerald-50 text-emerald-800 border-emerald-200",
+        warning: "bg-amber-50 text-amber-800 border-amber-200",
+        error: "bg-rose-50 text-rose-800 border-rose-200",
+        info: "bg-indigo-50 text-indigo-800 border-indigo-200"
+      };
+      container.innerHTML = `
+        <div class="p-4 rounded-lg border text-sm font-medium flex justify-between items-center ${colors[type] || colors.info}">
+          <span>${message}</span>
+          <button onclick="this.parentElement.remove()" class="text-xs font-bold ml-4">&times;</button>
+        </div>
+      `;
+    }
+
+    function switchAuthTab(tab) {
+      document.getElementById("form-login").classList.toggle("hidden", tab !== 'login');
+      document.getElementById("form-register").classList.toggle("hidden", tab !== 'register');
+      document.getElementById("tab-login").className = tab === 'login' ? "flex-1 pb-3 text-center font-semibold text-indigo-600 border-b-2 border-indigo-600 text-sm" : "flex-1 pb-3 text-center font-semibold text-gray-500 hover:text-gray-700 text-sm";
+      document.getElementById("tab-register").className = tab === 'register' ? "flex-1 pb-3 text-center font-semibold text-indigo-600 border-b-2 border-indigo-600 text-sm" : "flex-1 pb-3 text-center font-semibold text-gray-500 hover:text-gray-700 text-sm";
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById("login-email").value.trim();
+      const password = document.getElementById("login-password").value;
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Invalid email or password");
+        localStorage.setItem("token", data.access_token);
+        await initApp();
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const name = document.getElementById("register-name").value.trim();
+      const email = document.getElementById("register-email").value.trim();
+      const password = document.getElementById("register-password").value;
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Registration failed");
+        // Automatically login
+        const loginRes = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+        const loginData = await loginRes.json();
+        localStorage.setItem("token", loginData.access_token);
+        await initApp();
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem("token");
+      document.getElementById("nav-links").classList.add("hidden");
+      document.getElementById("nav-auth").classList.remove("hidden");
+      showView("auth");
+      showAlert("You have signed out.", "info");
+    }
+
+    function showView(view) {
+      const token = getToken();
+      if (!token && view !== "auth") {
+        view = "auth";
+      }
+      document.getElementById("view-auth").classList.toggle("hidden", view !== "auth");
+      document.getElementById("view-products").classList.toggle("hidden", view !== "products");
+      document.getElementById("view-orders").classList.toggle("hidden", view !== "orders");
+
+      if (view === "products") loadProducts();
+      if (view === "orders") loadOrdersAndRefunds();
+    }
+
+    async function initApp() {
+      const token = getToken();
+      if (!token) {
+        showView("auth");
+        return;
+      }
+      try {
+        const res = await fetch("/api/auth/me", { headers: authHeaders() });
+        if (!res.ok) throw new Error("Session expired");
+        const user = await res.json();
+        document.getElementById("user-display").textContent = user.profile ? user.profile.name : user.email;
+        document.getElementById("nav-links").classList.remove("hidden");
+        document.getElementById("nav-auth").classList.add("hidden");
+        showView("products");
+      } catch (err) {
+        logout();
+      }
+    }
+
+    async function loadProducts() {
+      try {
+        const res = await fetch("/api/products", { headers: authHeaders() });
+        const products = await res.json();
+        const grid = document.getElementById("products-grid");
+        if (!res.ok) throw new Error(products.detail || "Failed to load catalog");
+
+        grid.innerHTML = products.map(p => `
+          <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition">
+            <div class="bg-gray-100 h-44 flex items-center justify-center text-gray-400">
+              <svg class="w-16 h-16 stroke-current" fill="none" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+              </svg>
+            </div>
+            <div class="p-5 flex-grow flex flex-col justify-between">
+              <div>
+                <span class="inline-block text-[11px] font-semibold tracking-wider text-indigo-600 uppercase bg-indigo-50 px-2.5 py-0.5 rounded-full mb-2">${p.category}</span>
+                <h3 class="text-base font-bold text-gray-900 mb-1">${p.name}</h3>
+                <p class="text-lg font-bold text-gray-900 mb-4">$${p.price.toFixed(2)}</p>
+              </div>
+              <button onclick="placeOrder(${p.id})" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg text-sm shadow-sm transition">
+                Order Now
+              </button>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    async function placeOrder(productId) {
+      try {
+        const res = await fetch("/api/orders", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            product_id: productId,
+            device_fingerprint: simDeviceFp,
+            simulated_ip: simIp
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed to place order");
+
+        showAlert("Order placed successfully! Track its fulfillment status under 'My Orders'.", "success");
+        showView("orders");
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    function renderStatusBadge(status) {
+      if (status === "APPROVED") {
+        return `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold px-2.5 py-1 rounded-full">Approved &amp; Confirmed</span>`;
+      }
+      if (status === "PENDING_REVIEW") {
+        return `<span class="bg-amber-50 text-amber-700 border border-amber-200 text-xs font-semibold px-2.5 py-1 rounded-full">Under Verification</span>`;
+      }
+      return `<span class="bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold px-2.5 py-1 rounded-full">Action Required</span>`;
+    }
+
+    async function loadOrdersAndRefunds() {
+      try {
+        // Load Orders
+        const ordersRes = await fetch("/api/orders", { headers: authHeaders() });
+        const orders = await ordersRes.json();
+        const ordersList = document.getElementById("orders-list");
+
+        if (orders.length === 0) {
+          ordersList.innerHTML = `<div class="p-6 text-center text-sm text-gray-400 bg-white rounded-xl border">No orders placed yet.</div>`;
+        } else {
+          ordersList.innerHTML = orders.map(o => `
+            <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <div class="flex items-center space-x-3 mb-1">
+                  <span class="font-bold text-gray-900 text-base">${o.product.name}</span>
+                  ${renderStatusBadge(o.status)}
+                </div>
+                <div class="text-xs text-gray-500 space-x-4">
+                  <span>Order #${o.id}</span>
+                  <span>Amount: $${o.amount.toFixed(2)}</span>
+                  <span>Placed: ${new Date(o.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+              <button onclick="openRefundModal(${o.id})" class="text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 px-3.5 py-2 rounded-lg transition">
+                Request Refund
+              </button>
+            </div>
+          `).join('');
+        }
+
+        // Load Refunds
+        const refundsRes = await fetch("/api/refunds", { headers: authHeaders() });
+        const refunds = await refundsRes.json();
+        const refundsList = document.getElementById("refunds-list");
+
+        if (refunds.length === 0) {
+          refundsList.innerHTML = `<div class="p-6 text-center text-sm text-gray-400 bg-white rounded-xl border">No refund requests submitted.</div>`;
+        } else {
+          refundsList.innerHTML = refunds.map(r => `
+            <div class="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex justify-between items-center">
+              <div>
+                <div class="flex items-center space-x-3 mb-1">
+                  <span class="font-bold text-gray-900 text-sm">Refund for Order #${r.order_id}</span>
+                  ${renderStatusBadge(r.status)}
+                </div>
+                <div class="text-xs text-gray-500">
+                  <span>Reason: ${r.reason}</span> &bull; <span>Amount: $${r.amount.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    function openRefundModal(orderId) {
+      document.getElementById("refund-order-id").value = orderId;
+      document.getElementById("refund-modal").classList.remove("hidden");
+      document.getElementById("refund-modal").classList.add("flex");
+    }
+
+    function closeRefundModal() {
+      document.getElementById("refund-modal").classList.add("hidden");
+      document.getElementById("refund-modal").classList.remove("flex");
+    }
+
+    function toggleCustomReason(val) {
+      document.getElementById("refund-reason-text").classList.toggle("hidden", val !== "Other");
+    }
+
+    async function submitRefund(e) {
+      e.preventDefault();
+      const orderId = parseInt(document.getElementById("refund-order-id").value);
+      const selectVal = document.getElementById("refund-reason-select").value;
+      const textVal = document.getElementById("refund-reason-text").value.trim();
+      const reason = selectVal === "Other" ? textVal : selectVal;
+
+      if (!reason) {
+        alert("Please provide a reason for your refund.");
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/refunds", {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({ order_id: orderId, reason: reason })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Refund request failed");
+
+        closeRefundModal();
+
+        // Customer-friendly status messaging
+        if (data.status === "APPROVED") {
+          showAlert("Your refund request has been approved and processed.", "success");
+        } else if (data.status === "PENDING_REVIEW") {
+          showAlert("Your refund request is currently under review by our support team.", "warning");
+        } else {
+          showAlert("This refund could not be processed automatically — our support team will contact you.", "info");
+        }
+
+        loadOrdersAndRefunds();
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    // Initialize application on load
+    initApp();
+  </script>
+</body>
+</html>
+

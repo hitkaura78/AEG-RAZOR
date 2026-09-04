@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AEG-RAZOR - Admin Investigation Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Vis.js Network CDN for Relationship Graph -->
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col">
+
+  <!-- Header Navigation Bar -->
+  <header class="bg-slate-950 border-b border-slate-800 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="showTab('overview')">
+        <div class="bg-indigo-600 p-2 rounded-lg text-white">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="text-lg font-black tracking-wider bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">AEG-RAZOR</span>
+          <span class="text-[10px] text-slate-400 block -mt-1 font-mono uppercase tracking-widest">Internal Investigation Surface</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav id="admin-nav" class="hidden flex items-center space-x-6">
+        <button onclick="showTab('overview')" id="tab-overview" class="text-white font-semibold text-sm transition pb-1">
+          Overview
+        </button>
+        <button onclick="showTab('cases')" id="tab-cases" class="text-slate-400 hover:text-white font-medium text-sm transition pb-1">
+          Risk Cases
+        </button>
+        <button onclick="showTab('graph')" id="tab-graph" class="text-slate-400 hover:text-white font-medium text-sm transition pb-1">
+          Relationship Graph
+        </button>
+        <button onclick="showTab('metrics')" id="tab-metrics" class="text-slate-400 hover:text-white font-medium text-sm transition pb-1">
+          Model Evaluation
+        </button>
+        <div class="h-4 w-px bg-slate-800"></div>
+        <span id="admin-user-display" class="text-xs text-indigo-300 font-mono bg-indigo-950/80 border border-indigo-800 px-2.5 py-1 rounded-full"></span>
+        <button onclick="logoutAdmin()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-md font-medium transition border border-slate-700">
+          Sign Out
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Global Alerts -->
+  <div id="alert-container" class="max-w-7xl mx-auto px-4 mt-4 w-full"></div>
+
+  <!-- Main Dashboard Container -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Admin Login View -->
+    <section id="view-login" class="max-w-md mx-auto bg-slate-950 p-8 rounded-2xl border border-slate-800 shadow-xl">
+      <div class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-white tracking-tight">Admin Sign In</h1>
+        <p class="text-xs text-slate-400 mt-1">Full internal investigation and model management platform.</p>
+      </div>
+      <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">Admin Email</label>
+          <input type="email" id="admin-email" required value="admin@demo.abusegraph" class="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-100 outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-1">Password</label>
+          <input type="password" id="admin-password" required value="DemoAdmin123!" class="w-full px-3.5 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-100 outline-none focus:border-indigo-500">
+        </div>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg text-sm transition shadow-lg shadow-indigo-600/20">
+          Authenticate as Admin
+        </button>
+      </form>
+    </section>
+
+    <!-- Dashboard Content -->
+    <section id="view-dashboard" class="hidden space-y-8">
+
+      <!-- 1. Overview Tab -->
+      <div id="section-overview" class="space-y-6">
+        <div class="flex justify-between items-center bg-slate-950 p-6 rounded-2xl border border-slate-800">
+          <div>
+            <h1 class="text-2xl font-bold text-white">AEG-RAZOR System Overview</h1>
+            <p class="text-xs text-slate-400 mt-0.5">Real-time risk metrics, active queues, and synthetic demo controls.</p>
+          </div>
+          <div class="flex space-x-3">
+            <button onclick="triggerSimulateEvent()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition shadow-lg shadow-indigo-600/20 flex items-center space-x-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Simulate Live Event</span>
+            </button>
+            <button onclick="triggerReseed()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center space-x-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Retrain &amp; Reseed Data</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Overview Stat Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-mono uppercase">Total Customers</span>
+            <div id="stat-customers" class="text-2xl font-black text-white mt-1">--</div>
+          </div>
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-mono uppercase">Total Orders</span>
+            <div id="stat-orders" class="text-2xl font-black text-white mt-1">--</div>
+          </div>
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-mono uppercase">Total Refunds</span>
+            <div id="stat-refunds" class="text-2xl font-black text-white mt-1">--</div>
+          </div>
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-mono uppercase">Total Risk Cases</span>
+            <div id="stat-cases" class="text-2xl font-black text-indigo-400 mt-1">--</div>
+          </div>
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800 border-l-4 border-l-amber-500">
+            <span class="text-xs text-amber-400 font-mono uppercase">Pending Reviews</span>
+            <div id="stat-pending" class="text-2xl font-black text-amber-400 mt-1">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Unfiltered Cases Tab -->
+      <div id="section-cases" class="hidden space-y-4">
+        <div class="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-slate-800">
+          <h2 class="text-lg font-bold text-white">All Unfiltered Risk Cases</h2>
+          <button onclick="loadAdminCases()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+            Refresh Cases
+          </button>
+        </div>
+        <div class="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900 text-slate-400 uppercase font-mono border-b border-slate-800">
+                <tr>
+                  <th class="p-3.5">Case ID</th>
+                  <th class="p-3.5">Type</th>
+                  <th class="p-3.5">Status</th>
+                  <th class="p-3.5">ML Score</th>
+                  <th class="p-3.5">Graph Score</th>
+                  <th class="p-3.5">Final Score</th>
+                  <th class="p-3.5">Cluster Members</th>
+                  <th class="p-3.5">Merchant Decision</th>
+                  <th class="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="cases-tbody" class="divide-y divide-slate-800/60 font-mono"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Relationship Graph Tab -->
+      <div id="section-graph" class="hidden space-y-4">
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+          <div>
+            <h2 class="text-lg font-bold text-white">Visual Relationship Graph</h2>
+            <p class="text-xs text-slate-400">Interactive topology connecting Customers (Purple), Devices (Amber), IPs (Cyan), and Addresses (Green).</p>
+          </div>
+          <button onclick="loadRelationshipGraph()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+            Reload Graph
+          </button>
+        </div>
+        <!-- Graph Render Area -->
+        <div class="bg-slate-950 rounded-2xl border border-slate-800 p-4">
+          <div id="vis-graph" class="w-full h-[550px] bg-slate-900 rounded-xl"></div>
+        </div>
+      </div>
+
+      <!-- 4. Model Evaluation Tab -->
+      <div id="section-metrics" class="hidden space-y-6">
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+          <h2 class="text-lg font-bold text-white">XGBoost Model Performance &amp; Features</h2>
+          <p class="text-xs text-slate-400">PR-optimized model evaluation metrics and feature importance weights.</p>
+        </div>
+
+        <!-- Metrics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-mono uppercase">Precision</span>
+            <div id="metric-precision" class="text-2xl font-black text-indigo-400 mt-1">--</div>
+          </div>
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-mono uppercase">Recall</span>
+            <div id="metric-recall" class="text-2xl font-black text-cyan-400 mt-1">--</div>
+          </div>
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-mono uppercase">F1 Score</span>
+            <div id="metric-f1" class="text-2xl font-black text-emerald-400 mt-1">--</div>
+          </div>
+          <div class="bg-slate-950 p-5 rounded-xl border border-slate-800">
+            <span class="text-xs text-slate-400 font-mono uppercase">PR-AUC</span>
+            <div id="metric-prauc" class="text-2xl font-black text-amber-400 mt-1">--</div>
+          </div>
+        </div>
+
+        <!-- Charts Container -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+            <h3 class="text-sm font-bold text-white mb-4">Precision-Recall Curve</h3>
+            <canvas id="chart-pr-curve" class="w-full max-h-72"></canvas>
+          </div>
+          <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800">
+            <h3 class="text-sm font-bold text-white mb-4">XGBoost Feature Importances</h3>
+            <canvas id="chart-importances" class="w-full max-h-72"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Detailed Investigation Modal -->
+  <div id="detail-modal" class="fixed inset-0 bg-slate-950/80 hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-800 max-h-[90vh] overflow-y-auto space-y-6">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+        <div>
+          <h3 id="detail-title" class="text-xl font-bold text-white">Case Investigation Detail</h3>
+          <span id="detail-subtitle" class="text-xs text-slate-400 font-mono"></span>
+        </div>
+        <button onclick="closeDetailModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+
+      <!-- Raw Score Breakdown -->
+      <div class="grid grid-cols-3 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800 text-center font-mono">
+        <div>
+          <span class="text-[10px] text-slate-400 block uppercase">ML Score (60%)</span>
+          <span id="detail-ml-score" class="text-lg font-bold text-indigo-400">--</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block uppercase">Graph Score (40%)</span>
+          <span id="detail-graph-score" class="text-lg font-bold text-cyan-400">--</span>
+        </div>
+        <div>
+          <span class="text-[10px] text-slate-400 block uppercase">Combined Final Score</span>
+          <span id="detail-final-score" class="text-lg font-bold text-amber-400">--</span>
+        </div>
+      </div>
+
+      <!-- Reason Codes & Merchant Decision -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+          <span class="text-xs font-bold text-slate-300 block uppercase tracking-wider text-[10px]">Reason Codes</span>
+          <div id="detail-reason-codes" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+          <span class="text-xs font-bold text-slate-300 block uppercase tracking-wider text-[10px]">Merchant Resolution</span>
+          <div id="detail-merchant-decision" class="text-xs text-slate-400 font-mono">No decision recorded.</div>
+        </div>
+      </div>
+
+      <!-- Investigation Agent Narrative -->
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+        <span class="text-xs font-bold text-slate-300 block uppercase tracking-wider text-[10px]">Agent Explanation Narrative</span>
+        <p id="detail-agent-narrative" class="text-xs text-slate-300 italic bg-slate-900 p-3 rounded-lg border border-slate-800 leading-relaxed"></p>
+      </div>
+
+      <!-- Full Audit Trail Timeline -->
+      <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+        <span class="text-xs font-bold text-slate-300 block uppercase tracking-wider text-[10px]">Full Audit Trail</span>
+        <div id="detail-audit-trail" class="space-y-2 font-mono text-xs max-h-48 overflow-y-auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="bg-slate-950 border-t border-slate-800 mt-12 py-6 text-center text-xs text-slate-500">
+    AEG-RAZOR Admin Platform &bull; Unrestricted Technical Investigation Surface
+  </footer>
+
+  <script>
+    let prChartInstance = null;
+    let importancesChartInstance = null;
+    let visNetworkInstance = null;
+
+    function getAdminToken() {
+      return localStorage.getItem("admin_token");
+    }
+
+    function adminHeaders() {
+      return {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + getAdminToken()
+      };
+    }
+
+    function showAlert(message, type = "info") {
+      const container = document.getElementById("alert-container");
+      const colors = {
+        success: "bg-emerald-950 text-emerald-300 border-emerald-800",
+        warning: "bg-amber-950 text-amber-300 border-amber-800",
+        error: "bg-rose-950 text-rose-300 border-rose-800",
+        info: "bg-indigo-950 text-indigo-300 border-indigo-800"
+      };
+      container.innerHTML = `
+        <div class="p-4 rounded-lg border text-sm font-medium flex justify-between items-center ${colors[type] || colors.info}">
+          <span>${message}</span>
+          <button onclick="this.parentElement.remove()" class="text-xs font-bold ml-4">&times;</button>
+        </div>
+      `;
+    }
+
+    async function handleAdminLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById("admin-email").value.trim();
+      const password = document.getElementById("admin-password").value;
+
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Authentication failed");
+
+        localStorage.setItem("admin_token", data.access_token);
+        await initAdminApp();
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    function logoutAdmin() {
+      localStorage.removeItem("admin_token");
+      document.getElementById("view-login").classList.remove("hidden");
+      document.getElementById("view-dashboard").classList.add("hidden");
+      document.getElementById("admin-nav").classList.add("hidden");
+    }
+
+    async function initAdminApp() {
+      const token = getAdminToken();
+      if (!token) {
+        document.getElementById("view-login").classList.remove("hidden");
+        document.getElementById("view-dashboard").classList.add("hidden");
+        document.getElementById("admin-nav").classList.add("hidden");
+        return;
+      }
+
+      try {
+        const meRes = await fetch("/api/auth/me", { headers: adminHeaders() });
+        if (!meRes.ok) throw new Error("Session expired");
+        const user = await meRes.json();
+        
+        if (user.role !== "admin") {
+          throw new Error("Admin role authorization required.");
+        }
+
+        document.getElementById("admin-user-display").textContent = user.email;
+        document.getElementById("admin-nav").classList.remove("hidden");
+        document.getElementById("view-login").classList.add("hidden");
+        document.getElementById("view-dashboard").classList.remove("hidden");
+
+        await loadOverview();
+      } catch (err) {
+        showAlert(err.message, "error");
+        logoutAdmin();
+      }
+    }
+
+    function showTab(tab) {
+      document.getElementById("section-overview").classList.toggle("hidden", tab !== 'overview');
+      document.getElementById("section-cases").classList.toggle("hidden", tab !== 'cases');
+      document.getElementById("section-graph").classList.toggle("hidden", tab !== 'graph');
+      document.getElementById("section-metrics").classList.toggle("hidden", tab !== 'metrics');
+
+      const tabs = ['overview', 'cases', 'graph', 'metrics'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (btn) {
+          btn.className = t === tab ? "text-white font-semibold text-sm transition pb-1 border-b-2 border-indigo-500" : "text-slate-400 hover:text-white font-medium text-sm transition pb-1";
+        }
+      });
+
+      if (tab === 'overview') loadOverview();
+      if (tab === 'cases') loadAdminCases();
+      if (tab === 'graph') loadRelationshipGraph();
+      if (tab === 'metrics') loadAdminMetrics();
+    }
+
+    async function loadOverview() {
+      try {
+        const res = await fetch("/api/admin/overview", { headers: adminHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error("Failed to load overview");
+
+        document.getElementById("stat-customers").textContent = data.total_customers;
+        document.getElementById("stat-orders").textContent = data.total_orders;
+        document.getElementById("stat-refunds").textContent = data.total_refunds;
+        document.getElementById("stat-cases").textContent = data.total_cases;
+        document.getElementById("stat-pending").textContent = data.pending_reviews;
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    async function triggerSimulateEvent() {
+      try {
+        const res = await fetch("/api/admin/simulate-event", {
+          method: "POST",
+          headers: adminHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error("Simulation failed");
+
+        showAlert(`Live Event Simulated: Customer #${data.customer_id} Order #${data.order_id} -> Status: ${data.status}`, "success");
+        await loadOverview();
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    async function triggerReseed() {
+      try {
+        const res = await fetch("/api/admin/reseed", {
+          method: "POST",
+          headers: adminHeaders()
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error("Reseed failed");
+
+        showAlert("Pipeline Retrained and Baseline Dataset Reseeded!", "success");
+        await loadOverview();
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    async function loadAdminCases() {
+      try {
+        const res = await fetch("/api/admin/cases", { headers: adminHeaders() });
+        const cases = await res.json();
+        if (!res.ok) throw new Error("Failed to load risk cases");
+
+        const tbody = document.getElementById("cases-tbody");
+        if (cases.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="9" class="p-6 text-center text-slate-500">No risk cases recorded yet.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = cases.map(c => `
+          <tr class="hover:bg-slate-900/80 transition">
+            <td class="p-3.5 font-bold text-white">#${c.id}</td>
+            <td class="p-3.5"><span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">${c.case_type}</span></td>
+            <td class="p-3.5">
+              <span class="px-2.5 py-0.5 text-[11px] font-bold rounded-full ${
+                c.status === 'RESTRICTED' || c.status === 'Restrict' ? 'bg-rose-950 text-rose-400 border border-rose-800' :
+                c.status === 'PENDING_REVIEW' || c.status === 'Review' ? 'bg-amber-950 text-amber-400 border border-amber-800' :
+                'bg-emerald-950 text-emerald-400 border border-emerald-800'
+              }">${c.status}</span>
+            </td>
+            <td class="p-3.5 text-indigo-400 font-bold">${c.ml_score !== null ? c.ml_score.toFixed(4) : '--'}</td>
+            <td class="p-3.5 text-cyan-400 font-bold">${c.graph_score !== null ? c.graph_score.toFixed(2) : '--'}</td>
+            <td class="p-3.5 text-amber-400 font-bold">${c.final_score !== null ? c.final_score.toFixed(4) : '--'}</td>
+            <td class="p-3.5 text-slate-400 text-[11px]">${(c.customer_ids || []).join(', ')}</td>
+            <td class="p-3.5">
+              ${c.reviewer_decision ? `<span class="text-xs font-bold ${c.reviewer_decision === 'accept' ? 'text-emerald-400' : 'text-rose-400'}">${c.reviewer_decision.toUpperCase()}</span>` : '<span class="text-slate-500">None</span>'}
+            </td>
+            <td class="p-3.5 text-right">
+              <button onclick="openCaseDetail(${c.id})" class="px-3 py-1 bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white rounded border border-indigo-500/30 transition text-xs font-semibold">
+                Inspect Detail
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    async function openCaseDetail(caseId) {
+      try {
+        const res = await fetch(`/api/admin/cases/${caseId}`, { headers: adminHeaders() });
+        const c = await res.json();
+        if (!res.ok) throw new Error("Failed to load case detail");
+
+        document.getElementById("detail-title").textContent = `Risk Case #${c.id} (${c.case_type})`;
+        document.getElementById("detail-subtitle").textContent = `Cluster Key: ${c.cluster_key || 'N/A'}`;
+        document.getElementById("detail-ml-score").textContent = c.ml_score !== null ? c.ml_score.toFixed(4) : '--';
+        document.getElementById("detail-graph-score").textContent = c.graph_score !== null ? c.graph_score.toFixed(2) : '--';
+        document.getElementById("detail-final-score").textContent = c.final_score !== null ? c.final_score.toFixed(4) : '--';
+
+        const reasonContainer = document.getElementById("detail-reason-codes");
+        const codes = c.reason_codes || [];
+        reasonContainer.innerHTML = codes.length > 0 
+          ? codes.map(code => `<span class="bg-indigo-950 text-indigo-300 border border-indigo-800 text-[10px] font-mono px-2 py-0.5 rounded">${code}</span>`).join('')
+          : `<span class="text-slate-500 text-xs">No explicit reason codes</span>`;
+
+        document.getElementById("detail-merchant-decision").innerHTML = c.reviewer_decision
+          ? `<span class="font-bold ${c.reviewer_decision === 'accept' ? 'text-emerald-400' : 'text-rose-400'}">${c.reviewer_decision.toUpperCase()}</span> ${c.reviewer_note ? `&bull; Note: "${c.reviewer_note}"` : ''}`
+          : `No merchant decision logged.`;
+
+        document.getElementById("detail-agent-narrative").textContent = c.agent_explanation || "No written narrative generated.";
+
+        const auditContainer = document.getElementById("detail-audit-trail");
+        const audit = c.audit_trail || [];
+        auditContainer.innerHTML = audit.map(a => `
+          <div class="bg-slate-900 p-2.5 rounded border border-slate-800/80 flex justify-between items-center">
+            <div>
+              <span class="text-indigo-400 font-bold">${a.event_name}</span>
+              <span class="text-slate-400 ml-2">by ${a.actor}</span>
+            </div>
+            <span class="text-[10px] text-slate-500">${new Date(a.timestamp).toLocaleString()}</span>
+          </div>
+        `).join('');
+
+        document.getElementById("detail-modal").classList.remove("hidden");
+        document.getElementById("detail-modal").classList.add("flex");
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    function closeDetailModal() {
+      document.getElementById("detail-modal").classList.add("hidden");
+      document.getElementById("detail-modal").classList.remove("flex");
+    }
+
+    async function loadRelationshipGraph() {
+      try {
+        const res = await fetch("/api/admin/graph/cluster_all", { headers: adminHeaders() });
+        const graphData = await res.json();
+        if (!res.ok) throw new Error("Failed to load relationship graph");
+
+        const container = document.getElementById("vis-graph");
+        
+        // Build Vis.js Nodes & Edges
+        const visNodes = [];
+        const visEdges = [];
+
+        (graphData.nodes || []).forEach(n => {
+          let color = "#818cf8"; // Customer default (indigo)
+          let shape = "ellipse";
+          if (n.population === "coordinated_ring") color = "#f43f5e"; // Ring customer (rose)
+          
+          visNodes.push({ id: n.id, label: n.label, color: { background: color, border: "#ffffff" }, shape, font: { color: "#ffffff" } });
+
+          // Add Device node if present
+          if (n.device_id) {
+            const devId = `dev_${n.device_id}`;
+            if (!visNodes.some(vn => vn.id === devId)) {
+              visNodes.push({ id: devId, label: `Device: ${n.device_id}`, color: { background: "#f59e0b", border: "#ffffff" }, shape: "box", font: { color: "#ffffff" } });
+            }
+            visEdges.push({ from: n.id, to: devId, color: { color: "#f59e0b" }, label: "device" });
+          }
+
+          // Add IP node if present
+          if (n.ip_address_id) {
+            const ipId = `ip_${n.ip_address_id}`;
+            if (!visNodes.some(vn => vn.id === ipId)) {
+              visNodes.push({ id: ipId, label: `IP: ${n.ip_address_id}`, color: { background: "#06b6d4", border: "#ffffff" }, shape: "database", font: { color: "#ffffff" } });
+            }
+            visEdges.push({ from: n.id, to: ipId, color: { color: "#06b6d4" }, label: "ip" });
+          }
+        });
+
+        const data = { nodes: new vis.DataSet(visNodes), edges: new vis.DataSet(visEdges) };
+        const options = {
+          physics: { barnesHut: { gravitationalConstant: -2000, springLength: 95 } },
+          interaction: { hover: true, tooltipDelay: 100 }
+        };
+
+        if (visNetworkInstance) visNetworkInstance.destroy();
+        visNetworkInstance = new vis.Network(container, data, options);
+
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    async function loadAdminMetrics() {
+      try {
+        const res = await fetch("/api/admin/metrics", { headers: adminHeaders() });
+        const data = await res.json();
+        if (!res.ok) throw new Error("Failed to load model metrics");
+
+        const m = data.metrics || {};
+        document.getElementById("metric-precision").textContent = (m.precision || 0).toFixed(4);
+        document.getElementById("metric-recall").textContent = (m.recall || 0).toFixed(4);
+        document.getElementById("metric-f1").textContent = (m.f1 || 0).toFixed(4);
+        document.getElementById("metric-prauc").textContent = (m.pr_auc || 0).toFixed(4);
+
+        // Render PR Curve
+        const prCurve = data.pr_curve || [];
+        const prCtx = document.getElementById("chart-pr-curve").getContext("2d");
+        if (prChartInstance) prChartInstance.destroy();
+
+        prChartInstance = new Chart(prCtx, {
+          type: "line",
+          data: {
+            labels: prCurve.map(pt => (pt.recall || 0).toFixed(2)),
+            datasets: [{
+              label: "Precision vs Recall",
+              data: prCurve.map(pt => pt.precision || 0),
+              borderColor: "#818cf8",
+              backgroundColor: "rgba(129, 140, 248, 0.1)",
+              fill: true,
+              tension: 0.2
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { title: { display: true, text: "Recall", color: "#94a3b8" }, ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+              y: { title: { display: true, text: "Precision", color: "#94a3b8" }, ticks: { color: "#94a3b8" }, grid: { color: "#334155" }, min: 0, max: 1 }
+            },
+            plugins: { legend: { labels: { color: "#f8fafc" } } }
+          }
+        });
+
+        // Render Feature Importances
+        const importances = data.importances || {};
+        const impCtx = document.getElementById("chart-importances").getContext("2d");
+        if (importancesChartInstance) importancesChartInstance.destroy();
+
+        const impLabels = Object.keys(importances);
+        const impValues = Object.values(importances);
+
+        importancesChartInstance = new Chart(impCtx, {
+          type: "bar",
+          data: {
+            labels: impLabels,
+            datasets: [{
+              label: "XGBoost Feature Importance Weight",
+              data: impValues,
+              backgroundColor: "#06b6d4"
+            }]
+          },
+          options: {
+            indexAxis: "y",
+            responsive: true,
+            scales: {
+              x: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } },
+              y: { ticks: { color: "#94a3b8" }, grid: { color: "#334155" } }
+            },
+            plugins: { legend: { labels: { color: "#f8fafc" } } }
+          }
+        });
+
+      } catch (err) {
+        showAlert(err.message, "error");
+      }
+    }
+
+    initAdminApp();
+  </script>
+</body>
+</html>
+

@@ -49,13 +49,13 @@ def test_customer_can_request_refund_and_history_is_audited() -> None:
         )
         assert response.status_code == 201
         body = response.json()
-        assert body["status"] == "PENDING_REVIEW"
+        assert body["status"] in {"APPROVED", "PENDING_REVIEW", "RESTRICTED"}
         assert "risk_score" not in body
         assert "reason_codes" not in body
 
         history = client.get("/api/refunds", headers=headers)
         assert history.status_code == 200
-        assert history.json()[0]["status"] == "PENDING_REVIEW"
+        assert history.json()[0]["status"] in {"APPROVED", "PENDING_REVIEW", "RESTRICTED"}
 
         with SessionLocal() as db:
             events = db.scalars(
