@@ -197,3 +197,49 @@ def test_admin_endpoints_full_investigation_surface() -> None:
         assert reseed_res.status_code == 200
         assert reseed_res.json()["status"] == "trained"
 
+
+def test_end_to_end_audit_trail_sequence() -> None:
+    with TestClient(app) as client:
+        cust_token = get_token(client, "customer")
+        merch_token = get_token(client, "merchant")
+        admin_token = get_token(client, "admin")
+
+        headers_cust = {"Authorization": f"Bearer {cust_token}"}
+        headers_merch = {"Authorization": f"Bearer {merch_token}"}
+        headers_admin = {"Authorization": f"Bearer {admin_token}"}
+
+        # 1. Customer creates order & requests refund
+        order_id, case_id = create_sample_order_and_case(client, cust_token)
+
+        # 2. Query admin case detail to retrieve full audit trail
+        detail_res = client.get(f"/api/admin/cases/{case_id}", headers=headers_admin)
+        assert detail_res.status_code == 200
+        audit_trail = detail_res.json()["audit_trail"]
+
+        event_names = [a["event_name"] for a in audit_trail]
+
+        # Verify key audit trail sequence events exist
+        assert "webhook_received" in event_names, "Audit trail must contain webhook_received event"
+        assert "risk_evaluated" in event_names, "Audit trail must contain risk_evaluated event"
+        assert "agent_explanation_generated" in event_names, "Audit trail must contain agent_explanation_generated event"
+        assert "policy_evaluated" in event_names, "Audit trail must contain policy_evaluated event"
+
+        # Verify webhook payload actor on webhook_received event
+        webhook_event = next(a for a in audit_trail if a["event_name"] == "webhook_received")
+        assert webhook_event["actor"] == "payment_gateway"
+
+        # 3. Merchant makes decision
+        dec_res = client.post(
+            f"/api/merchant/cases/{case_id}/decision",
+            headers=headers_merch,
+            json={"decision": "accept", "note": "End-to-end test approval"},
+        )
+        assert dec_res.status_code == 200
+
+        # 4. Verify merchant_decision added to audit trail
+        detail_after_res = client.get(f"/api/admin/cases/{case_id}", headers=headers_admin)
+        assert detail_after_res.status_code == 200
+        updated_event_names = [a["event_name"] for a in detail_after_res.json()["audit_trail"]]
+        assert "merchant_decision" in updated_event_names
+
+

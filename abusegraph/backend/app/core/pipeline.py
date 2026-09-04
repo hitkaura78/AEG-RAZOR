@@ -324,6 +324,32 @@ def evaluate_refund_risk(
             db.flush()
             is_new_case = True
 
+        # SIMULATED PAYMENT PROCESSOR WEBHOOK LOG ENTRY
+        # Documented clean swap point: mirrors payment gateway (e.g. Razorpay/Stripe) refund.created webhook payload.
+        webhook_payload = {
+            "event": "refund.created",
+            "gateway": "razorpay_simulated",
+            "order_id": target_order_id,
+            "customer_id": target_customer_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "payload": {
+                "refund_id": f"ref_{target_order_id}",
+                "status": "requested",
+                "device_fingerprint": target_device_id,
+                "ip_address": target_ip_address,
+            }
+        }
+        db.add(AuditLog(
+            event_name="webhook_received",
+            customer_id=c_int,
+            order_id=t_ord_int,
+            case_id=case.id,
+            actor="payment_gateway",
+            action="webhook_received",
+            details=json.dumps({"event": "refund.created"}),
+            metadata_json=json.dumps(webhook_payload),
+        ))
+
         # Audit Log Event Vocabulary (Phase 1 vocabulary)
         audit_meta = {
             "customer_history": "NEW" if is_new_customer else "EXISTING",
@@ -392,6 +418,18 @@ def evaluate_refund_risk(
             }),
         ))
 
+        if policy_status in ("Review", "PENDING_REVIEW"):
+            db.add(AuditLog(
+                event_name="merchant_notified",
+                customer_id=c_int,
+                order_id=t_ord_int,
+                case_id=case.id,
+                actor="system",
+                action="merchant_notified",
+                details=json.dumps({"case_id": case.id, "channel": "in_app_dashboard"}),
+                metadata_json=json.dumps({"pending_review": True, "cluster_key": cluster_key}),
+            ))
+
         db.commit()
 
     return policy_status
@@ -439,4 +477,3 @@ def simulate_event(
         "case_id": case.id if case else None,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-

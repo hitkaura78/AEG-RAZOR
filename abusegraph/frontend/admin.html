@@ -648,6 +648,16 @@
     }
 
     initAdminApp();
+
+    // Lightweight polling for live demo cross-surface propagation
+    setInterval(() => {
+      if (getAdminToken() && document.getElementById("view-dashboard") && !document.getElementById("view-dashboard").classList.contains("hidden")) {
+        const overviewVisible = !document.getElementById("section-overview").classList.contains("hidden");
+        const casesVisible = !document.getElementById("section-cases").classList.contains("hidden");
+        if (overviewVisible) loadOverview();
+        if (casesVisible) loadAdminCases();
+      }
+    }, 3000);
   </script>
 </body>
 </html>

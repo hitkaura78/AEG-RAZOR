@@ -407,6 +407,13 @@
     }
 
     initMerchantApp();
+
+    // Lightweight polling for live demo cross-surface propagation
+    setInterval(() => {
+      if (getMerchantToken() && document.getElementById("view-dashboard") && !document.getElementById("view-dashboard").classList.contains("hidden")) {
+        loadMerchantData();
+      }
+    }, 3000);
   </script>
 </body>
 </html>

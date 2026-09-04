@@ -27,7 +27,7 @@ def test_normal_order_is_approved_and_velocity_triggers_review() -> None:
         assert products.status_code == 200
         product_id = products.json()[0]["id"]
         device = f"demo-device-{uuid4().hex}"
-        ip_address = f"203.0.113.{uuid4().int % 200 + 1}"
+        ip_address = f"203.{uuid4().int % 250}.{uuid4().int % 250}.{(uuid4().int % 250) + 1}"
 
         first = client.post(
             "/api/orders",
