@@ -161,39 +161,28 @@ def evaluate_refund_risk(
     all_orders = [dict(o) for o in synthetic_orders]
     all_refunds = [dict(r) for r in synthetic_refunds]
 
-    target_found = False
-    for cust in all_customers:
-        if str(cust.get("id")) == target_cust_str:
-            target_found = True
-            if target_device_id and str(target_device_id) != "dev_ring" and str(target_device_id) != "dev_norm":
-                cust["device_id"] = str(target_device_id)
-            if target_ip_address and not str(target_ip_address).startswith("198.51.100."):
-                cust["ip_address_id"] = str(target_ip_address)
-            break
+    if db is not None:
+        db_customers = db.scalars(select(Customer)).all()
+        db_orders = db.scalars(select(Order)).all()
+        db_refunds = db.scalars(select(Refund)).all()
 
-    if not target_found and target_cust_str:
-        new_cust = {
-            "id": target_cust_str,
-            "device_id": str(target_device_id or f"device_{target_cust_str}"),
-            "ip_address_id": str(target_ip_address or "127.0.0.1"),
-            "address_id": f"addr_{target_cust_str}",
-            "population": "normal",
-        }
-        all_customers.append(new_cust)
-
-    # Add DB orders / refunds to dataset if DB session provided
-    if db is not None and c_int is not None:
-        db_orders = db.scalars(select(Order).where(Order.customer_id == c_int)).all()
+        cust_dev_map = {}
+        cust_ip_map = {}
         for o in db_orders:
+            cid_str = str(o.customer_id)
+            dev_str = o.device.fingerprint if o.device else str(o.device_id)
+            ip_str = o.ip_address.address if o.ip_address else str(o.ip_address_id)
+            cust_dev_map[cid_str] = dev_str
+            cust_ip_map[cid_str] = ip_str
             all_orders.append({
                 "id": str(o.id),
-                "customer_id": str(o.customer_id),
+                "customer_id": cid_str,
                 "amount": float(o.amount),
                 "created_at": o.created_at,
-                "device_id": str(o.device_id),
-                "ip_address_id": o.ip_address.address if o.ip_address else str(o.ip_address_id),
+                "device_id": dev_str,
+                "ip_address_id": ip_str,
             })
-        db_refunds = db.scalars(select(Refund).where(Refund.customer_id == c_int)).all()
+
         for r in db_refunds:
             all_refunds.append({
                 "id": str(r.id),
@@ -201,6 +190,55 @@ def evaluate_refund_risk(
                 "customer_id": str(r.customer_id),
                 "amount": float(r.amount),
                 "created_at": r.created_at,
+            })
+
+        for c in db_customers:
+            cid_str = str(c.id)
+            dev_str = cust_dev_map.get(cid_str)
+            if not dev_str:
+                if cid_str == target_cust_str and target_device_id:
+                    dev_obj = db.get(Device, target_device_id) if str(target_device_id).isdigit() else None
+                    dev_str = dev_obj.fingerprint if dev_obj else str(target_device_id)
+                else:
+                    dev_str = f"device_{cid_str}"
+
+            ip_str = cust_ip_map.get(cid_str)
+            if not ip_str:
+                if cid_str == target_cust_str and target_ip_address:
+                    ip_str = str(target_ip_address)
+                else:
+                    ip_str = "127.0.0.1"
+
+            existing = next((cust for cust in all_customers if str(cust.get("id")) == cid_str), None)
+            if existing:
+                existing["device_id"] = dev_str
+                existing["ip_address_id"] = ip_str
+            else:
+                all_customers.append({
+                    "id": cid_str,
+                    "device_id": dev_str,
+                    "ip_address_id": ip_str,
+                    "address_id": f"addr_{cid_str}",
+                    "population": "normal",
+                })
+    else:
+        target_found = False
+        for cust in all_customers:
+            if str(cust.get("id")) == target_cust_str:
+                target_found = True
+                if target_device_id and str(target_device_id) != "dev_ring" and str(target_device_id) != "dev_norm":
+                    cust["device_id"] = str(target_device_id)
+                if target_ip_address and not str(target_ip_address).startswith("198.51.100."):
+                    cust["ip_address_id"] = str(target_ip_address)
+                break
+
+        if not target_found and target_cust_str:
+            all_customers.append({
+                "id": target_cust_str,
+                "device_id": str(target_device_id or f"device_{target_cust_str}"),
+                "ip_address_id": str(target_ip_address or "127.0.0.1"),
+                "address_id": f"addr_{target_cust_str}",
+                "population": "normal",
             })
 
     # 4. Relationship graph and cluster feature computation
