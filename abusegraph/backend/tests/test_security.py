@@ -157,3 +157,4 @@ def test_audit_logs_never_contain_plaintext_passwords() -> None:
             assert "CustomerPass123!" not in details
             assert "DemoAdmin123!" not in meta
             assert "DemoAdmin123!" not in details
+

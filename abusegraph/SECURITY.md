@@ -46,3 +46,4 @@ A production deployment of AEG-RAZOR would require the following controls beyond
 - **Rate Limiting**: IP and user-level rate limiting on authentication endpoints (`/api/auth/login`, `/api/auth/register`) to prevent brute-force attacks.
 - **Immutable Audit Access Logging**: Secure access logging for admin investigation views and merchant decision actions.
 - **Secret Rotation**: KMS/Secrets Manager integration for database credentials and JWT signing keys.
+
