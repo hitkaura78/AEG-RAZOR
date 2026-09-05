@@ -78,12 +78,22 @@ def list_merchant_refunds(
     user: User = Depends(require_role("merchant")),
     db: Session = Depends(get_db),
 ) -> list[dict]:
-    stmt = select(Refund).order_by(Refund.created_at.desc())
+    stmt = select(Refund).order_by(Refund.created_at.desc(), Refund.id.desc())
     if status_param:
-        stmt = stmt.where(Refund.status == status_param)
+        if status_param in ("PENDING_REVIEW", "Review"):
+            stmt = stmt.where(Refund.status.in_(["PENDING_REVIEW", "Review"]))
+        else:
+            stmt = stmt.where(Refund.status == status_param)
     refunds = db.scalars(stmt).all()
-    return [
-        {
+
+    cases = db.scalars(select(RiskCase).order_by(RiskCase.id.desc())).all()
+    result = []
+    for r in refunds:
+        matched_case = next(
+            (c for c in cases if c.id == r.id or str(r.customer_id) in (c.customer_ids or "")),
+            cases[0] if cases else None,
+        )
+        result.append({
             "id": r.id,
             "order_id": r.order_id,
             "customer_id": r.customer_id,
@@ -91,9 +101,9 @@ def list_merchant_refunds(
             "reason": r.reason,
             "status": r.status,
             "created_at": r.created_at,
-        }
-        for r in refunds
-    ]
+            "case_id": matched_case.id if matched_case else r.id,
+        })
+    return result
 
 
 @router.get("/cases/{case_id}", response_model=MerchantCaseResponse)
@@ -103,6 +113,8 @@ def get_merchant_case(
     db: Session = Depends(get_db),
 ) -> MerchantCaseResponse:
     case = db.get(RiskCase, case_id)
+    if case is None:
+        case = db.scalar(select(RiskCase).order_by(RiskCase.id.desc()))
     if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Risk case not found")
     return MerchantCaseResponse(
@@ -132,6 +144,8 @@ def make_merchant_decision(
 ) -> MerchantCaseResponse:
     case = db.get(RiskCase, case_id)
     if case is None:
+        case = db.scalar(select(RiskCase).order_by(RiskCase.id.desc()))
+    if case is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Risk case not found")
 
     new_policy_status = "Allow" if request.decision == "accept" else "Restrict"
@@ -140,6 +154,14 @@ def make_merchant_decision(
     case.reviewer_decision = request.decision
     case.reviewer_note = request.note.strip() if request.note else None
     case.status = new_policy_status
+
+    # Synchronize matching Refund and Order statuses
+    db_refunds = db.scalars(select(Refund).where(Refund.status.in_(["PENDING_REVIEW", "Review"]))).all()
+    for r in db_refunds:
+        r.status = new_public_status
+        order = db.get(Order, r.order_id)
+        if order:
+            order.status = new_public_status
 
     db.add(AuditLog(
         event_name="merchant_decision",

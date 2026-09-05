@@ -241,19 +241,26 @@
       return { text: "Low Risk Band", class: "bg-emerald-100 text-emerald-800 border-emerald-200" };
     }
 
-    async function loadMerchantData() {
+    async function loadMerchantData(isPolling = false) {
       try {
         const refundsRes = await fetch("/api/merchant/refunds", { headers: merchantHeaders() });
+        if (refundsRes.status === 401 || refundsRes.status === 403) {
+          console.warn("Merchant session expired or unauthorized during poll.");
+          logoutMerchant();
+          return;
+        }
         const refunds = await refundsRes.json();
         if (!refundsRes.ok) throw new Error("Failed to load merchant requests");
 
-        // Fetch detailed evidence for cases
         const pendingContainer = document.getElementById("pending-cases-list");
         const historyContainer = document.getElementById("history-cases-list");
 
-        // Filter pending refunds
+        // Filter and sort pending refunds descending (newest first)
         const pendingRefunds = refunds.filter(r => r.status === "PENDING_REVIEW" || r.status === "Review");
+        pendingRefunds.sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id);
+
         const historyRefunds = refunds.filter(r => r.status !== "PENDING_REVIEW" && r.status !== "Review");
+        historyRefunds.sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id);
 
         // Update Pending Counter Badge
         const badge = document.getElementById("pending-badge");
@@ -264,15 +271,15 @@
           badge.classList.add("hidden");
         }
 
-        // Render Pending Queue
+        // Render Pending Queue (Newest prepended at top)
         if (pendingRefunds.length === 0) {
           pendingContainer.innerHTML = `<div class="p-8 text-center bg-white rounded-xl border border-slate-200 text-slate-500 text-sm">No cases currently require a decision.</div>`;
         } else {
           const pendingCards = await Promise.all(pendingRefunds.map(async (r) => {
-            // Attempt case detail fetch
             let caseDetail = null;
+            const targetCaseId = r.case_id || r.id;
             try {
-              const cRes = await fetch(`/api/merchant/cases/${r.id}`, { headers: merchantHeaders() });
+              const cRes = await fetch(`/api/merchant/cases/${targetCaseId}`, { headers: merchantHeaders() });
               if (cRes.ok) caseDetail = await cRes.json();
             } catch (e) {}
 
@@ -281,7 +288,7 @@
             const explanation = caseDetail ? (caseDetail.agent_explanation || "Investigation summary available.") : "Standard merchant review requested.";
 
             return `
-              <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+              <div id="card-pending-${targetCaseId}" class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4 transition-all duration-500 hover:border-indigo-300">
                 <div class="flex justify-between items-start">
                   <div>
                     <div class="flex items-center space-x-3 mb-1">
@@ -318,10 +325,10 @@
 
                 <!-- Merchant Actions -->
                 <div class="flex justify-end items-center space-x-3 pt-2">
-                  <button onclick="openDecisionModal(${r.id}, 'reject')" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs rounded-lg transition shadow-sm">
+                  <button onclick="openDecisionModal(${targetCaseId}, 'reject')" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-medium text-xs rounded-lg transition shadow-sm">
                     Reject Refund (Restrict)
                   </button>
-                  <button onclick="openDecisionModal(${r.id}, 'accept')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition shadow-sm">
+                  <button onclick="openDecisionModal(${targetCaseId}, 'accept')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs rounded-lg transition shadow-sm">
                     Accept Refund (Approve)
                   </button>
                 </div>
@@ -356,7 +363,8 @@
         }
 
       } catch (err) {
-        showAlert(err.message, "error");
+        if (!isPolling) showAlert(err.message, "error");
+        else console.warn("Merchant poll error:", err);
       }
     }
 
@@ -408,10 +416,14 @@
 
     initMerchantApp();
 
-    // Lightweight polling for live demo cross-surface propagation
-    setInterval(() => {
+    // Protected 3-second background polling for real-time cross-surface propagation
+    setInterval(async () => {
       if (getMerchantToken() && document.getElementById("view-dashboard") && !document.getElementById("view-dashboard").classList.contains("hidden")) {
-        loadMerchantData();
+        try {
+          await loadMerchantData(true);
+        } catch (err) {
+          console.warn("Merchant interval polling error:", err);
+        }
       }
     }, 3000);
   </script>

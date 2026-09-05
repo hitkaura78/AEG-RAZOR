@@ -506,6 +506,22 @@ def simulate_event(
 
     case = db.scalar(select(RiskCase).order_by(RiskCase.id.desc()))
 
+    refund_status = policy.persisted_status(status)
+    existing_refund = db.scalar(select(Refund).where(Refund.order_id == order_id))
+    if existing_refund is None:
+        db.add(Refund(
+            order_id=order_id,
+            customer_id=cid,
+            amount=49.99,
+            reason="Simulated refund abuse event",
+            status=refund_status,
+            created_at=datetime.now(timezone.utc),
+        ))
+        db.commit()
+    else:
+        existing_refund.status = refund_status
+        db.commit()
+
     return {
         "customer_id": cid,
         "order_id": order_id,
