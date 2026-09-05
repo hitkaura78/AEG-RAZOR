@@ -96,11 +96,11 @@ def _llm_has_only_evidence_numbers(text: str, evidence: dict[str, Any]) -> bool:
     return all(token in allowed for token in re.findall(r"(?<![A-Za-z])\d+(?:\.\d+)?", text))
 
 
-def _call_anthropic(evidence: dict[str, Any], api_key: str) -> dict[str, Any] | None:
+def _call_gemini(evidence: dict[str, Any], api_key: str) -> dict[str, Any] | None:
     try:
-        import anthropic
+        from google import genai
 
-        client = anthropic.Anthropic(api_key=api_key)
+        client = genai.Client(api_key=api_key)
         prompt = (
             "Explain this investigation using ONLY the JSON evidence provided. Do not invent "
             "numbers, facts, signals, or history. Mention the customer history as either "
@@ -110,12 +110,11 @@ def _call_anthropic(evidence: dict[str, Any], api_key: str) -> dict[str, Any] | 
             "in this form: Recommendation: <allow|manual review|restrict>.\n\n"
             f"Evidence JSON:\n{json.dumps(evidence, sort_keys=True)}"
         )
-        response = client.messages.create(
-            model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20240620"),
-            max_tokens=500,
-            messages=[{"role": "user", "content": prompt}],
+        response = client.models.generate_content(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+            contents=prompt,
         )
-        text = "\n".join(block.text for block in response.content if getattr(block, "text", None)).strip()
+        text = (response.text or "").strip()
         match = re.search(r"Recommendation:\s*(allow|manual review|restrict)\s*$", text, re.IGNORECASE)
         if not match or not _llm_has_only_evidence_numbers(text, evidence):
             return None
@@ -132,7 +131,7 @@ def investigate(evidence: dict[str, Any]) -> dict[str, Any]:
     """Return an informational explanation and recommendation for evidence."""
     _validate_evidence(evidence)
     load_dotenv(Path(__file__).resolve().parents[2] / ".env")
-    if api_key := os.getenv("ANTHROPIC_API_KEY", "").strip():
-        if llm_result := _call_anthropic(evidence, api_key):
+    if api_key := os.getenv("GEMINI_API_KEY", "").strip():
+        if llm_result := _call_gemini(evidence, api_key):
             return llm_result
     return _fallback(evidence)

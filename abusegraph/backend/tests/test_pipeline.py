@@ -160,7 +160,8 @@ def test_risk_engine_combine_math_and_reason_codes() -> None:
     assert "HIGH_INDIVIDUAL_RISK" in codes
 
 
-def test_agent_explanation_grounding_and_no_hallucinations() -> None:
+def test_agent_explanation_grounding_and_no_hallucinations(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     evidence = {
         "cluster_size": 3,
         "shared_device": True,
@@ -176,6 +177,7 @@ def test_agent_explanation_grounding_and_no_hallucinations() -> None:
     }
 
     res = agent.investigate(evidence)
+    assert res["used_llm"] is False
     explanation = res["explanation"]
     assert isinstance(explanation, str) and len(explanation) > 0
 
@@ -185,5 +187,48 @@ def test_agent_explanation_grounding_and_no_hallucinations() -> None:
     assert "0.75" in explanation
     assert "0.8" in explanation
     assert "0.77" in explanation
+
+
+def test_agent_gemini_llm_mock(monkeypatch: pytest.MonkeyPatch) -> None:
+    evidence = {
+        "cluster_size": 3,
+        "shared_device": True,
+        "shared_ip": False,
+        "shared_address": False,
+        "avg_time_to_refund_hours": 12.5,
+        "ml_score": 0.75,
+        "graph_score": 0.80,
+        "final_score": 0.77,
+        "is_new_customer": True,
+        "prior_refund_count": 0,
+        "prior_case_count": 0,
+    }
+
+    class MockResponse:
+        text = (
+            "Customer is a first-time customer with 0 prior refunds. Shared device detected in cluster of 3 customers. "
+            "Average time to refund is 12.5 hours. ML score is 0.75, graph score is 0.8, combined score is 0.77.\n"
+            "Recommendation: manual review"
+        )
+
+    class MockModels:
+        def generate_content(self, model: str, contents: str) -> MockResponse:
+            assert model == "gemini-2.5-flash"
+            return MockResponse()
+
+    class MockClient:
+        def __init__(self, api_key: str) -> None:
+            assert api_key == "test-gemini-key"
+            self.models = MockModels()
+
+    import google.genai
+    monkeypatch.setattr(google.genai, "Client", MockClient)
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+
+    res = agent.investigate(evidence)
+    assert res["used_llm"] is True
+    assert res["recommendation"] == "manual review"
+    assert "0.77" in res["explanation"]
+
 
 

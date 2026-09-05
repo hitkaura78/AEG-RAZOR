@@ -8,7 +8,7 @@ xgboost
 networkx
 python-dotenv
 pydantic
-anthropic
+google-genai
 passlib[bcrypt]
 bcrypt<5
 python-jose[cryptography]

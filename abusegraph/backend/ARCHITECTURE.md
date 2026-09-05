@@ -49,7 +49,7 @@ logic owns all Allow/Review/Restrict decisions.
 The investigation agent is informational only. It receives the score,
 relationship, timing, and customer-history evidence and returns an explanation
 plus a recommendation for an authorized reviewer. It never sets an order or
-case status; only `policy.decide()` may do that. Without an Anthropic API key,
+case status; only `policy.decide()` may do that. Without a Gemini API key,
 the deterministic fallback uses the same evidence and shared-IP/address
 caveats with no external configuration.
 ## 2. User Experiences and Data Visibility

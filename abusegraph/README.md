@@ -89,7 +89,7 @@ gunicorn -w 4 -k uvicorn.workers.UvicornWorker backend.app.main:app
 | `JWT_SECRET_KEY` | Secret key for signing JWT tokens | **Must change in production!** |
 | `JWT_ALGORITHM` | Algorithm used for JWT encoding | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Session token expiry duration | `120` |
-| `ANTHROPIC_API_KEY` | Optional API key for Claude Sonnet narratives | `sk-ant-api03-...` |
+| `GEMINI_API_KEY` | Optional API key for Google Gemini narratives | `AIzaSy...` |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated or `*`) | `https://yourdomain.com` |
 
 ---
